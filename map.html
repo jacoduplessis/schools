@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Schools</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    *:after, *:before {
+      box-sizing: inherit;
+    }
+
+    body {
+      margin: 0
+    }
+
+    #controls {
+      position: fixed;
+      top: 20px;
+      z-index: 600;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 1rem;
+      background: black;
+      border-radius: 5px;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+<div id="controls">
+
+  <label>Phase</label>
+  <select name="phase" onchange="filter('phase', event.target.value)">
+    <option selected value="">All</option>
+    <option>PRIMARY SCHOOL</option>
+    <option>COMBINED SCHOOL</option>
+    <option>SECONDARY SCHOOL</option>
+    <option>INTERMEDIATE SCHOOL</option>
+  </select>
+
+  <label>Ownership</label>
+  <select name="ownership" onchange="filter('ownership', event.target.value)">
+    <option>STATE</option>
+    <option>COMPANY</option>
+    <option>UNKOWN</option>
+    <option>CHURCH</option>
+    <option>PRIVATE INDIVIDUAL</option>
+    <option>PRIVATE</option>
+    <option>TRUST</option>
+    <option>FARM</option>
+    <option>FACTORY</option>
+    <option>PUBLIC</option>
+    <option>MINE</option>
+    <option>HOSPITAL</option>
+    <option>State</option>
+    <option>TRUST LAND</option>
+    <option>TRIBAL</option>
+  </select>
+
+  <label>Province</label>
+  <select name="province" onchange="filter('province', event.target.value)">
+    <option selected value="">All</option>
+    <option>WC</option>
+    <option>EC</option>
+    <option>NC</option>
+    <option>FS</option>
+    <option>KZ</option>
+    <option>NW</option>
+    <option>GP</option>
+    <option>MP</option>
+    <option>LP</option>
+  </select>
+</div>
+<div id="map" style="height: 100vh; width: 100%"></div>
+
+<link rel="stylesheet" href="leaflet-120.css">
+<link rel="stylesheet" href="cluster-110.css">
+
+<script src="leaflet-120.js"></script>
+<script src="cluster-110.js"></script>
+<script src="topojson.js"></script>
+
+<script>
+  var map = L.map('map', {
+    maxZoom: 15,
+  }).setView([-30, 25], 6);
+  var cluster = L.markerClusterGroup();
+  map.addLayer(cluster)
+
+  var schools
+  var filters = {}
+
+  fetch('schools.json').then(r => r.json()).then(data => schools = data)
+
+  fetch('local.topojson')
+    .then(r => r.json())
+    .then(topo => {
+      var geo = topojson.feature(topo, topo.objects.layer1)
+      var geoLayer = L.geoJSON(geo, {
+        style: function (feature) {
+          return {color: '#fff'}
+        }
+      }).addTo(map)
+    })
+
+  function updateSchools(schools) {
+    cluster.clearLayers()
+    schools.forEach(school => {
+      const marker = L.marker([school.lat, school.lng], {
+        title: school.name, alt: school.emis
+      })
+      const p = L.popup()
+      p.setContent("")
+      marker.bindPopup(p)
+      marker.on('popupopen', function () {
+        fetch('/schools/' + school.emis + '/').then(r => r.json()).then(data => {
+          p.setContent("<pre>" + JSON.stringify(data, null, 4) + "</pre>")
+        })
+      })
+      cluster.addLayer(marker)
+    })
+    cluster.refreshClusters()
+  }
+
+  function filter(key, value) {
+    if (value === "") delete filters[key]
+    else filters[key] = value
+    console.log(filters)
+    updateSchools(schools.filter(s => {
+      let result = true
+      Object.keys(filters).forEach(filterKey => {
+        if (s[filterKey] !== filters[filterKey]) result = false
+      })
+      return result
+    }))
+  }
+
+  setTimeout(() => {
+    updateSchools(schools.slice(100, 300))
+  }, 3000)
+
+</script>
+</body>
+</html>
